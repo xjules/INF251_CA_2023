@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.0)
 
-project(VboIbo)
+project(obj)
 
-set(OpenGL_GL_PREFERENCE "GLVND")
+if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    set(OpenGL_GL_PREFERENCE "GLVND")
+endif()
 find_package(GLUT REQUIRED)
 if(GLUT_FOUND)
   message(STATUS "INC_DIR= Found GLUT: ${GLUT_INCLUDE_DIRS}")

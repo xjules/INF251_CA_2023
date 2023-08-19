@@ -1,6 +1,13 @@
+#ifdef __APPLE__
+#include <GL/glew.h>   // Always first
+#include <OpenGL/gl.h> // Then the main OpenGL header
+#include <GLUT/glut.h> // Then GLUT or other windowing headers
+#else
 #include <GL/glew.h>
-#include <GL/glut.h>
 #include <GL/gl.h>
+#include <GL/glut.h>
+#endif
+
 #include <cmath>
 #include <fstream>
 #include <iostream>
