@@ -11,8 +11,7 @@ using namespace std;
 
 // --- OpenGL callbacks ---------------------------------------------------------------------------
 void display(GLFWwindow *);
-// void idle();
-void reshape(GLFWwindow *, int, int);
+void idle(GLFWwindow *);
 void keyboard(GLFWwindow *, int, int, int, int);
 void mouse(GLFWwindow *, int, int, int);
 void motion(GLFWwindow *, double, double);

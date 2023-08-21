@@ -1,12 +1,5 @@
-#ifdef __APPLE__
-#include <GL/glew.h>   // Always first
-#include <OpenGL/gl.h> // Then the main OpenGL header
-#include <GLUT/glut.h> // Then GLUT or other windowing headers
-#else
 #include <GL/glew.h>
-#include <GL/gl.h>
-#include <GL/glut.h>
-#endif
+#include <GLFW/glfw3.h>
 
 #include <fstream>
 #include <iostream>
@@ -18,11 +11,11 @@
 using namespace std;
 
 // --- OpenGL callbacks ---------------------------------------------------------------------------
-void display();
-void idle();
-void keyboard(unsigned char, int, int);
-void mouse(int, int, int, int);
-void motion(int, int);
+void display(GLFWwindow *);
+void idle(GLFWwindow *);
+void keyboard(GLFWwindow *, int, int, int, int);
+void mouse(GLFWwindow *, int, int, int);
+void motion(GLFWwindow *, double, double);
 
 // --- Other methods ------------------------------------------------------------------------------
 bool initMesh();
@@ -43,57 +36,57 @@ Vector3f Translation; ///< Translation
 float Scaling;		  ///< Scaling
 
 // Mouse interaction
-int MouseX, MouseY; ///< The last position of the mouse
-int MouseButton;	///< The last mouse button pressed or released
+double MouseX, MouseY; ///< The last position of the mouse
+int MouseButton;	   ///< The last mouse button pressed or released
 
 // --- main() -------------------------------------------------------------------------------------
 /// The entry point of the application
 int main(int argc, char **argv)
 {
 
-	// Initialize glut and create a simple window
-	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
-	glutInitWindowSize(800, 600);
-	glutInitWindowPosition(300, 50);
-	glutCreateWindow("OpenGL Tutorial");
-
-	// Initialize OpenGL callbacks
-	glutDisplayFunc(display);
-	glutIdleFunc(idle);
-	glutKeyboardFunc(keyboard);
-	glutMouseFunc(mouse);
-	glutMotionFunc(motion);
-
-	// Initialize glew (must be done after glut is initialized!)
-	GLenum res = glewInit();
-	if (res != GLEW_OK)
+	if (!glfwInit())
 	{
-		cerr << "Error initializing glew: \n"
-			 << reinterpret_cast<const char *>(glewGetErrorString(res)) << endl;
+		cerr << "Error initializing GLFW." << endl;
 		return -1;
 	}
 
-	// Initialize program variables
-	// OpenGL
-	glClearColor(0.1f, 0.3f, 0.1f, 0.0f); // background color
-	glEnable(GL_DEPTH_TEST);			  // enable depth ordering
-	glEnable(GL_CULL_FACE);				  // enable back-face culling
-	glFrontFace(GL_CCW);				  // vertex order for the front face
-	glCullFace(GL_BACK);				  // back-faces should be removed
+	GLFWwindow *window = glfwCreateWindow(800, 600, "OpenGL Tutorial", nullptr, nullptr);
+	if (!window)
+	{
+		cerr << "Error creating window with GLFW." << endl;
+		glfwTerminate();
+		return -1;
+	}
 
-	glPolygonMode(GL_FRONT, GL_LINE); // draw polygons as wireframe
+	glfwMakeContextCurrent(window);
 
-	// Transformation
-	Translation.set(0.0f, 0.0f, 0.0f);
+	// Set callbacks
+	glfwSetKeyCallback(window, keyboard);
+	glfwSetMouseButtonCallback(window, mouse);
+	glfwSetCursorPosCallback(window, motion);
+
+	GLenum res = glewInit();
+	if (res != GLEW_OK)
+	{
+		cerr << "Error initializing GLEW: " << glewGetErrorString(res) << endl;
+		return -1;
+	}
+
+	Translation.set(0, 0, 0);
 	Scaling = 1.0f;
-
-	// Shaders & mesh
+	glClearColor(0.1f, 0.3f, 0.1f, 0.0f);
 	if (!initShaders() || !initMesh())
 		return -1;
 
-	// Start the main event loop
-	glutMainLoop();
+	while (!glfwWindowShouldClose(window))
+	{
+		display(window);
+		// idle();
+		glfwPollEvents();
+	}
+
+	glfwDestroyWindow(window);
+	glfwTerminate();
 
 	return 0;
 }
@@ -101,7 +94,7 @@ int main(int argc, char **argv)
 // ************************************************************************************************
 // *** OpenGL callbacks implementation ************************************************************
 /// Called whenever the scene has to be drawn
-void display()
+void display(GLFWwindow *window)
 {
 	// Clear the screen
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -148,67 +141,66 @@ void display()
 	glUseProgram(0);
 
 	// Swap the frame buffers (off-screen rendering)
-	glutSwapBuffers();
+	glfwSwapBuffers(window);
 }
 
 /// Called at regular intervals (can be used for animations)
-void idle()
+void idle(GLFWwindow *window)
 {
 }
 
 /// Called whenever a keyboard button is pressed (only ASCII characters)
-void keyboard(unsigned char key, int x, int y)
+void keyboard(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
-	switch (tolower(key))
+	switch (key)
 	{
-	case 'g': // show the current OpenGL version
+	case GLFW_KEY_G: // show the current OpenGL version
 		cout << "OpenGL version " << glGetString(GL_VERSION) << endl;
 		break;
-	case 'q': // terminate the application
+	case GLFW_KEY_Q: // terminate the application
 		exit(0);
 		break;
-	case 'r':
+	case GLFW_KEY_R:
 		cout << "Re-loading shaders..." << endl;
 		if (initShaders())
 		{
 			cout << "> done." << endl;
-			glutPostRedisplay();
 		}
 	}
 }
 
 /// Called whenever a mouse event occur (press or release)
-void mouse(int button, int state, int x, int y)
+void mouse(GLFWwindow *window, int button, int action, int mods)
 {
 	// Store the current mouse status
-	MouseButton = button;
-	MouseX = x;
-	MouseY = y;
+	if (action == GLFW_PRESS)
+	{
+		MouseButton = button;
+		glfwGetCursorPos(window, &MouseX, &MouseY);
+	}
 }
 
 /// Called whenever the mouse is moving while a button is pressed
-void motion(int x, int y)
+void motion(GLFWwindow *window, double xpos, double ypos)
 {
-	if (MouseButton == GLUT_RIGHT_BUTTON)
+	if (MouseButton == GLFW_MOUSE_BUTTON_RIGHT)
 	{
-		Translation.x() += 0.003f * (x - MouseX); // Accumulate translation amount
-		Translation.y() += 0.003f * (MouseY - y);
-		MouseX = x; // Store the current mouse position
-		MouseY = y;
+		Translation.x() += 0.003f * (xpos - MouseX); // Accumulate translation amount
+		Translation.y() += 0.003f * (MouseY - ypos);
+		MouseX = xpos; // Store the current mouse position
+		MouseY = ypos;
 	}
-	if (MouseButton == GLUT_MIDDLE_BUTTON)
+	if (MouseButton == GLFW_MOUSE_BUTTON_MIDDLE)
 	{
-		Scaling += 0.003f * (MouseY - y); // Accumulate scaling amount
-		MouseX = x;						  // Store the current mouse position
-		MouseY = y;
+		Scaling += 0.003f * (MouseY - ypos); // Accumulate scaling amount
+		MouseX = xpos;						 // Store the current mouse position
+		MouseY = ypos;
 	}
-	if (MouseButton == GLUT_LEFT_BUTTON)
+	if (MouseButton == GLFW_MOUSE_BUTTON_LEFT)
 	{
 
 		// Rotations will be explained in the next lecture
 	}
-
-	glutPostRedisplay(); // Specify that the scene needs to be updated
 }
 
 // ************************************************************************************************
