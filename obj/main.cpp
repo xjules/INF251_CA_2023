@@ -74,7 +74,15 @@ int main(int argc, char **argv)
 
 	Translation.set(0, 0, 0);
 	Scaling = 1.0f;
-	glClearColor(0.1f, 0.3f, 0.1f, 0.0f);
+	// Initialize program variables
+	// OpenGL
+	glClearColor(0.1f, 0.3f, 0.1f, 0.0f); // background color
+	glEnable(GL_DEPTH_TEST);			  // enable depth ordering
+	glEnable(GL_CULL_FACE);				  // enable back-face culling
+	glFrontFace(GL_CCW);				  // vertex order for the front face
+	glCullFace(GL_BACK);				  // back-faces should be removed
+	glPolygonMode(GL_FRONT, GL_LINE);	  // draw polygons as wireframe
+
 	if (!initShaders() || !initMesh())
 		return -1;
 
