@@ -170,7 +170,7 @@ void motion(GLFWwindow *window, double xpos, double ypos)
     if (MouseButton == GLFW_MOUSE_BUTTON_RIGHT)
     {
         Translation.x() += 0.003f * (xpos - MouseX);
-        Translation.y() += 0.003f * (ypos - MouseY);
+        Translation.y() += 0.003f * (MouseY - ypos);
         MouseX = xpos;
         MouseY = ypos;
     }
@@ -212,6 +212,7 @@ void initBuffers()
                  indices,
                  GL_STATIC_DRAW);
 } /* initBuffers() */
+
 /// Initialize shaders. Return false if initialization fail.
 bool initShaders()
 {
