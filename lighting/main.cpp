@@ -1,12 +1,5 @@
-#ifdef __APPLE__
-#include <GL/glew.h>   // Always first
-#include <OpenGL/gl.h> // Then the main OpenGL header
-#include <GLUT/glut.h> // Then GLUT or other windowing headers
-#else
 #include <GL/glew.h>
-#include <GL/gl.h>
-#include <GL/glut.h>
-#endif
+#include <GLFW/glfw3.h>
 
 #include <cmath>
 #include <fstream>
@@ -46,12 +39,11 @@ struct Camera
 // on the shaders.
 
 // --- OpenGL callbacks ---------------------------------------------------------------------------
-void display();
-void idle();
-void keyboard(unsigned char, int, int);
-void mouse(int, int, int, int);
-void motion(int, int);
-void special(int, int, int);
+void display(GLFWwindow *);
+void idle(GLFWwindow *);
+void keyboard(GLFWwindow *, int, int, int, int);
+void mouse(GLFWwindow *, int, int, int);
+void motion(GLFWwindow *, double, double);
 
 // --- Other methods ------------------------------------------------------------------------------
 void initBuffers();
@@ -95,8 +87,8 @@ GLuint WallVBO = 0;
 GLuint WallIBO = 0;
 
 // Mouse control
-int MouseX, MouseY;
-int MouseButton;
+double MouseX, MouseY;
+int MouseButton = -1;
 
 // Camera
 Camera Cam;
@@ -106,20 +98,30 @@ Camera Cam;
 int main(int argc, char **argv)
 {
 
-	// Initialize glut and create a simple window
-	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
-	glutInitWindowSize(800, 600);
-	glutInitWindowPosition(300, 50);
-	glutCreateWindow("OpenGL Tutorial");
+	// Initialize glfw and create a simple window
+	if (!glfwInit())
+	{
+		cerr << "Error initializing GLFW." << endl;
+		return -1;
+	}
+
+	GLFWwindow *window = glfwCreateWindow(800, 600, "OpenGL Tutorial", nullptr, nullptr);
+	if (!window)
+	{
+		cerr << "Error creating window with GLFW." << endl;
+		glfwTerminate();
+		return -1;
+	}
+
+	glfwMakeContextCurrent(window);
+
+	// Set callbacks
+	glfwSetKeyCallback(window, keyboard);
+	glfwSetMouseButtonCallback(window, mouse);
+	glfwSetCursorPosCallback(window, motion);
 
 	// Initialize OpenGL callbacks
-	glutDisplayFunc(display);
-	glutIdleFunc(idle);
-	glutKeyboardFunc(keyboard);
-	glutMouseFunc(mouse);
-	glutMotionFunc(motion);
-	glutSpecialFunc(special);
+	// glutIdleFunc(idle);
 
 	// Initialize glew (must be done after glut is initialized!)
 	GLenum res = glewInit();
@@ -144,7 +146,10 @@ int main(int argc, char **argv)
 	Cam.zoom = 1.f;
 
 	// OpenGL
-	glutSetCursor(GLUT_CURSOR_CROSSHAIR); // hide the cursor
+	GLFWcursor *cursor = glfwCreateStandardCursor(GLFW_CROSSHAIR_CURSOR);
+	if (cursor != NULL)
+		glfwSetCursor(window, cursor);
+
 	glClearColor(0.1f, 0.3f, 0.1f, 0.0f);
 	initBuffers();
 	if (!initShaders())
@@ -155,7 +160,16 @@ int main(int argc, char **argv)
 	}
 
 	// Start the main event loop
-	glutMainLoop();
+	while (!glfwWindowShouldClose(window))
+	{
+		display(window);
+		// idle();
+		glfwPollEvents();
+	}
+
+	glfwDestroyCursor(cursor);
+	glfwDestroyWindow(window);
+	glfwTerminate();
 
 	return 0;
 }
@@ -163,12 +177,13 @@ int main(int argc, char **argv)
 // ************************************************************************************************
 // *** OpenGL callbacks implementation ************************************************************
 /// Called whenever the scene has to be drawn
-void display()
+void display(GLFWwindow *window)
 {
 	// Prepare the screen
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	int width = glutGet(GLUT_WINDOW_WIDTH);
-	int height = glutGet(GLUT_WINDOW_HEIGHT);
+	int width, height;
+	glfwGetWindowSize(window, &width, &height);
+
 	glViewport(0, 0, width, height);
 
 	// Enable depth test
@@ -249,46 +264,46 @@ void display()
 	glUseProgram(0);
 
 	// Lock the mouse at the center of the screen
-	glutWarpPointer(MouseX, MouseY);
+	glfwSetCursorPos(window, MouseX, MouseY);
 
 	// Swap the frame buffers (off-screen rendering)
-	glutSwapBuffers();
+	glfwSwapBuffers(window);
 }
 
 /// Called at regular intervals (can be used for animations)
-void idle()
+void idle(GLFWwindow *window)
 {
 }
 
 /// Called whenever a keyboard button is pressed (only ASCII characters)
-void keyboard(unsigned char key, int x, int y)
+void keyboard(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
 	Vector3f right;
 
-	switch (tolower(key))
+	switch (key)
 	{
 		// --- camera movements ---
-	case 'w':
+	case GLFW_KEY_W:
 		Cam.position += Cam.target * 0.1f;
 		break;
-	case 'a':
+	case GLFW_KEY_A:
 		right = Cam.target.cross(Cam.up);
 		Cam.position -= right * 0.1f;
 		break;
-	case 's':
+	case GLFW_KEY_S:
 		Cam.position -= Cam.target * 0.1f;
 		break;
-	case 'd':
+	case GLFW_KEY_D:
 		right = Cam.target.cross(Cam.up);
 		Cam.position += right * 0.1f;
 		break;
-	case 'c':
+	case GLFW_KEY_C:
 		Cam.position -= Cam.up * 0.1f;
 		break;
-	case ' ':
+	case GLFW_KEY_SPACE:
 		Cam.position += Cam.up * 0.1f;
 		break;
-	case 'r': // Reset camera status
+	case GLFW_KEY_R: // Reset camera status
 		Cam.position.set(0.f, 0.f, 0.f);
 		Cam.target.set(0.f, 0.f, -1.f);
 		Cam.up.set(0.f, 1.f, 0.f);
@@ -300,48 +315,34 @@ void keyboard(unsigned char key, int x, int y)
 		break;
 
 		// --- utilities ---
-	case 'p': // change to wireframe rendering
+	case GLFW_KEY_P: // change to wireframe rendering
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		break;
-	case 'o': // change to polygon rendering
+	case GLFW_KEY_O: // change to polygon rendering
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		break;
-	case 'g': // show the current OpenGL version
+	case GLFW_KEY_G: // show the current OpenGL version
 		cout << "OpenGL version " << glGetString(GL_VERSION) << endl;
 		break;
-	case 'l': // reload shaders
+	case GLFW_KEY_L: // reload shaders
 		cout << "Re-loading shaders..." << endl;
 		if (initShaders())
 		{
 			cout << "> done." << endl;
-			glutPostRedisplay();
 		}
 		break;
-	case 'q': // terminate the application
+	case GLFW_KEY_Q: // terminate the application
 		exit(0);
 		break;
-	}
-	// redraw
-	glutPostRedisplay();
-}
-
-// Called whenever a special keyboard button is pressed
-void special(int key, int x, int y)
-{
-	Vector3f right;
-
-	switch (key)
-	{
-		// --- camera movements ---
-	case GLUT_KEY_PAGE_UP: // Increase field of view
+	case GLFW_KEY_PAGE_UP: // Increase field of view
 		Cam.fov = min(Cam.fov + 1.f, 179.f);
 		break;
-	case GLUT_KEY_PAGE_DOWN: // Decrease field of view
+	case GLFW_KEY_PAGE_DOWN: // Decrease field of view
 		Cam.fov = max(Cam.fov - 1.f, 1.f);
 		break;
 
 		// --- utilities ---
-	case GLUT_KEY_F5: // Reload shaders
+	case GLFW_KEY_F5: // Reload shaders
 		cout << "Re-loading shaders..." << endl;
 		if (initShaders())
 		{
@@ -349,36 +350,43 @@ void special(int key, int x, int y)
 		}
 		break;
 	}
-	// redraw
-	glutPostRedisplay();
 }
 
 /// Called whenever a mouse event occur (press or release)
-void mouse(int button, int state, int x, int y)
+void mouse(GLFWwindow *window, int button, int action, int mods)
 {
 	// Store the current mouse status
-	MouseButton = button;
-
-	// Instead of updating the mouse position, lock it at the center of the screen
-	MouseX = glutGet(GLUT_WINDOW_WIDTH) / 2;
-	MouseY = glutGet(GLUT_WINDOW_HEIGHT) / 2;
-	glutWarpPointer(MouseX, MouseY);
+	if (action == GLFW_PRESS)
+	{
+		// Instead of updating the mouse position, lock it at the center of the screen
+		MouseButton = button;
+		int width, height;
+		glfwGetWindowSize(window, &width, &height);
+		MouseX = width / 2;
+		MouseY = height / 2;
+		// glfwSetCursorPos(window, MouseX, MouseY);
+	}
+	else
+	{
+		MouseButton = -1;
+	}
 }
 
 /// Called whenever the mouse is moving while a button is pressed
-void motion(int x, int y)
+void motion(GLFWwindow *window, double x, double y)
 {
 
-	if (MouseButton == GLUT_RIGHT_BUTTON)
+	cout << "\nPMouse button..." << MouseButton << endl;
+	if (MouseButton == GLFW_MOUSE_BUTTON_RIGHT)
 	{
 		Cam.position += Cam.target * 0.003f * (MouseY - y);
 		Cam.position += Cam.target.cross(Cam.up) * 0.003f * (x - MouseX);
 	}
-	if (MouseButton == GLUT_MIDDLE_BUTTON)
+	if (MouseButton == GLFW_MOUSE_BUTTON_MIDDLE)
 	{
-		Cam.zoom = max(0.001f, Cam.zoom + 0.003f * (y - MouseY));
+		Cam.zoom = max(0.001f, Cam.zoom + 0.003f * (float)(y - MouseY));
 	}
-	if (MouseButton == GLUT_LEFT_BUTTON)
+	if (MouseButton == GLFW_MOUSE_BUTTON_LEFT)
 	{
 		Matrix4f ry, rr;
 
@@ -392,9 +400,11 @@ void motion(int x, int y)
 		Cam.up = rr * Cam.up;
 		Cam.target = rr * Cam.target;
 	}
-
-	// Redraw the scene
-	glutPostRedisplay();
+	if (MouseButton == -1)
+	{
+		MouseX = x;
+		MouseY = y;
+	}
 }
 
 // ************************************************************************************************
